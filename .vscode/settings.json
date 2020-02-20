@@ -1,0 +1,15 @@
+{
+  "tslint.enable": true,
+  "editor.tabSize": 2,
+  "files.exclude": {
+    "qasOut": false
+  },
+  "search.exclude": {
+    "qasOut": true,
+    "images": true,
+    "icons": true,
+    "examples": true
+  },
+  "typescript.tsdk": "./node_modules/typescript/lib",
+  "vsicons.projectDetection.disableDetect": true
+}
