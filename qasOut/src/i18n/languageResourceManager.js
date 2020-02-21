@@ -1,30 +1,25 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const models = require("../models/i18n");
-const langResourceCollection_1 = require("./langResourceCollection");
+const langResources = require("../../../lang.nls.bundle.json");
 const constants_1 = require("../constants");
 class LanguageResourceManager {
-    constructor(language, resourceCollection) {
-        this.language = language;
-        this.resourceCollection = resourceCollection;
-        this.resourceCollection = this.resourceCollection || langResourceCollection_1.langResourceCollection;
-        this.messages =
-            (this.language && this.resourceCollection[this.language.toLowerCase()]) ||
-                this.resourceCollection['en'];
+    constructor(locale) {
+        this.locale = locale;
+        this.defaultLangResource = langResources.en;
+        this.currentLangResource =
+            (this.locale && langResources[this.locale]) || this.defaultLangResource;
     }
-    getMessage(...keys) {
-        if (!this.messages) {
-            return '';
-        }
+    localize(...keys) {
         let msg = '';
-        keys.forEach(key => {
-            // If key is of type 'number' it's a LangResourceKeys
-            const stringifiedKey = typeof key === 'number' ? models.LangResourceKeys[key] : key;
+        keys
+            .filter((key) => key !== null && key !== undefined)
+            .forEach((key) => {
             if (typeof key === 'number') {
-                if (Reflect.has(this.messages, stringifiedKey)) {
+                const resourceKey = key;
+                if (this.currentLangResource.length > resourceKey) {
                     // If no message is found fallback to english message
-                    let message = this.messages[stringifiedKey] ||
-                        langResourceCollection_1.langResourceCollection['en'][stringifiedKey];
+                    let message = this.currentLangResource[resourceKey] ||
+                        this.defaultLangResource[resourceKey];
                     // If not a string then it's of type IOSSpecific
                     if (typeof message !== 'string') {
                         if (Reflect.has(message, process.platform)) {
@@ -37,17 +32,23 @@ class LanguageResourceManager {
                     msg += message;
                     return;
                 }
-                throw new Error(`${stringifiedKey} is not valid`);
+                throw new Error(`Language resource key '${key}' is not valid`);
             }
-            stringifiedKey.split('').forEach(char => {
+            key.split('').forEach(char => {
                 if (char.match(/[#^*|\\/{}+=]/g)) {
                     throw new Error(`${char} is not valid`);
                 }
                 msg += char;
-                return;
             });
         });
-        return msg.replace(/%extensionName%/gi, constants_1.constants.extensionName).trim();
+        return msg.replace(/%extensionName%/gi, constants_1.constants.extension.name).trim();
+    }
+    getLangResourceKey(message) {
+        if (!message) {
+            return undefined;
+        }
+        const key = this.currentLangResource.findIndex(res => res === message);
+        return key > -1 ? key : undefined;
     }
 }
 exports.LanguageResourceManager = LanguageResourceManager;

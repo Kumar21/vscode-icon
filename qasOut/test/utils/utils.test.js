@@ -1,224 +1,285 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-// tslint:disable only-arrow-functions
-// tslint:disable no-unused-expression
+/* eslint-disable prefer-arrow-callback */
+/* eslint-disable no-unused-expressions */
 const chai_1 = require("chai");
-const fs = require("fs");
 const os = require("os");
+const proxyq = require("proxyquire");
 const sinon = require("sinon");
-const utils = require("../../src/utils");
+const path = require("path");
+const fsAsync = require("../../src/common/fsAsync");
+const models_1 = require("../../src/models");
+const utils_1 = require("../../src/utils");
 describe('Utils: tests', function () {
     context('ensures that', function () {
-        context(`the correct 'vscode' path gets returned when the process platform is`, function () {
-            let env;
-            let originalPlatform;
-            before(() => {
-                env = Object.assign({}, process.env);
-                originalPlatform = process.platform;
-            });
-            after(() => {
-                process.env = env;
-                Object.defineProperty(process, 'platform', {
-                    value: originalPlatform,
+        let sandbox;
+        let existsAsyncStub;
+        beforeEach(function () {
+            sandbox = sinon.createSandbox();
+            existsAsyncStub = sandbox.stub(fsAsync, 'existsAsync').resolves();
+        });
+        afterEach(function () {
+            sandbox.restore();
+        });
+        context(`the 'getAppDataDirPath' function`, function () {
+            context(`returns the correct 'vscode' path`, function () {
+                context(`when the process platform is`, function () {
+                    let envStub;
+                    let platformStub;
+                    beforeEach(function () {
+                        envStub = sandbox.stub(process, 'env');
+                        platformStub = sandbox.stub(process, 'platform');
+                    });
+                    it('darwin (macOS)', function () {
+                        const dirPath = `${os.homedir()}/Library/Application Support`;
+                        platformStub.value('darwin');
+                        chai_1.expect(utils_1.Utils.getAppDataDirPath()).to.be.equal(dirPath);
+                    });
+                    it('linux', function () {
+                        const dirPath = `${os.homedir()}/.config`;
+                        platformStub.value('linux');
+                        chai_1.expect(utils_1.Utils.getAppDataDirPath()).to.be.equal(dirPath);
+                    });
+                    it('win32 (windows)', function () {
+                        const dirPath = 'C:\\Users\\User\\AppData\\Roaming';
+                        envStub.value({
+                            APPDATA: dirPath,
+                        });
+                        platformStub.value('win32');
+                        chai_1.expect(utils_1.Utils.getAppDataDirPath()).to.be.equal(dirPath);
+                    });
+                    it('NOT implemented', function () {
+                        const dirPath = '/var/local';
+                        platformStub.value('freebsd');
+                        chai_1.expect(utils_1.Utils.getAppDataDirPath()).to.be.equal(dirPath);
+                    });
                 });
             });
-            it('darwin (macOS)', function () {
-                process.env.HOME = os.homedir();
-                const path = `${process.env.HOME}/Library/Application Support`;
-                Object.defineProperty(process, 'platform', { value: 'darwin' });
-                chai_1.expect(utils.vscodePath()).to.be.equal(path);
-            });
-            it('linux', function () {
-                const path = `${os.homedir()}/.config`;
-                Object.defineProperty(process, 'platform', { value: 'linux' });
-                chai_1.expect(utils.vscodePath()).to.be.equal(path);
-            });
-            it('win32 (windows)', function () {
-                const path = 'C:\\Users\\User\\AppData\\Roaming';
-                process.env.APPDATA = path;
-                Object.defineProperty(process, 'platform', { value: 'win32' });
-                chai_1.expect(utils.vscodePath()).to.be.equal(path);
-            });
-            it('not implemented', function () {
-                const path = '/var/local';
-                Object.defineProperty(process, 'platform', { value: 'freebsd' });
-                chai_1.expect(utils.vscodePath()).to.be.equal(path);
+        });
+        context(`the 'pathUnixJoin' function`, function () {
+            it('returns a path using Unix separator', function () {
+                chai_1.expect(utils_1.Utils.pathUnixJoin('path', 'to', 'code')).to.equal('path/to/code');
             });
         });
-        context(`the 'createDirectoryRecursivelySync' function`, function () {
-            it('creates a directory and all subdirectories synchronously', function () {
-                const testCase = (directoryPath, expectedCounts) => {
-                    const sandbox = sinon.createSandbox();
-                    const fileCheck = sandbox
-                        .stub(fs, 'existsSync')
-                        .callsFake((path) => directoryPath.split('/').indexOf(path) !== -1);
-                    const createDirectory = sandbox.stub(fs, 'mkdirSync');
-                    utils.createDirectoryRecursively(directoryPath);
-                    chai_1.expect(fileCheck.called).to.be.true;
-                    chai_1.expect(createDirectory.callCount).to.equal(expectedCounts);
-                    sandbox.restore();
-                };
-                // Absolute path
-                testCase('/path/to', 3);
-                // Relative path
-                testCase('path/to', 2);
+        context(`the 'tempPath' function`, function () {
+            it('returns the path to the OS temporary directory', function () {
+                chai_1.expect(utils_1.Utils.tempPath()).to.equal(os.tmpdir());
             });
         });
-        context(`the 'deleteDirectoryRecursivelySync' function`, function () {
-            it('deletes a directory and all subdirectories synchronously', function () {
-                // const directoryPath = '/path/to';
-                // const sandbox = sinon.createSandbox();
-                // const fileCheck = sandbox
-                //   .stub(fs, 'existsSync')
-                //   .callsFake(path => path === directoryPath);
-                // const readDirectory = sandbox
-                //   .stub(fs, 'readdirSync')
-                //   .callsFake(() => ['dir', 'file.txt']);
-                // const var6: any = '/path/to/file.txt';
-                // const stats = sandbox.stub(fs, 'lstatSync').callsFake(var6);
-                // const deleteFile = sandbox.stub(fs, 'unlinkSync');
-                // const removeDirectory = sandbox.stub(fs, 'rmdirSync');
-                // utils.deleteDirectoryRecursively(directoryPath);
-                // expect(fileCheck.called).to.be.true;
-                // expect(readDirectory.called).to.be.true;
-                // expect(stats.called).to.be.true;
-                // expect(deleteFile.called).to.be.true;
-                // expect(removeDirectory.called).to.be.true;
-                // sandbox.restore();
-                true;
+        context(`the 'fileFormatToString' function`, function () {
+            it(`returns the string representation of the 'FileFormat'`, function () {
+                chai_1.expect(utils_1.Utils.fileFormatToString('svg')).to.equal('.svg');
+                chai_1.expect(utils_1.Utils.fileFormatToString(models_1.FileFormat.svg)).to.equal('.svg');
+            });
+        });
+        context(`the 'createDirectoryRecursively' function`, function () {
+            context('creates all directories asynchronously', function () {
+                context(`when the process platform is`, function () {
+                    let pathSepStub;
+                    let mkdirAsyncStub;
+                    beforeEach(function () {
+                        pathSepStub = sandbox.stub(path, 'sep');
+                        mkdirAsyncStub = sandbox.stub(fsAsync, 'mkdirAsync').resolves();
+                    });
+                    const testCase = (directoryPath, dirExists, expectedCounts) => __awaiter(this, void 0, void 0, function* () {
+                        const fileCheck = existsAsyncStub.callsFake((dirPath) => dirExists ||
+                            directoryPath.split(path.sep).indexOf(dirPath) !== -1);
+                        const createDirectory = mkdirAsyncStub.resolves();
+                        fileCheck.resetHistory();
+                        createDirectory.resetHistory();
+                        yield utils_1.Utils.createDirectoryRecursively(directoryPath);
+                        chai_1.expect(fileCheck.callCount).to.be.equal(dirExists ? expectedCounts + 2 : expectedCounts);
+                        chai_1.expect(createDirectory.callCount).to.equal(expectedCounts);
+                    });
+                    it('win32 (windows)', function () {
+                        return __awaiter(this, void 0, void 0, function* () {
+                            pathSepStub.value('\\');
+                            // Directory Exists
+                            yield testCase('path\\to', true, 0);
+                            // Create Directory
+                            // - Relative path
+                            yield testCase('.\\path', false, 2);
+                            // - Absolute path
+                            yield testCase('C:\\path\\to', false, 3);
+                        });
+                    });
+                    it('*nix', function () {
+                        return __awaiter(this, void 0, void 0, function* () {
+                            pathSepStub.value('/');
+                            // Directory Exists
+                            yield testCase('path/to', true, 0);
+                            // Create Directory
+                            // - Relative path
+                            yield testCase('path/to', false, 2);
+                            // - Absolute path
+                            yield testCase('/path/to', false, 3);
+                        });
+                    });
+                });
+            });
+        });
+        context(`the 'deleteDirectoryRecursively' function`, function () {
+            let readdirAsyncStub;
+            it('deletes a directory and all subdirectories asynchronously', function () {
+                return __awaiter(this, void 0, void 0, function* () {
+                    readdirAsyncStub = sandbox.stub(fsAsync, 'readdirAsync').resolves();
+                    const directoryPath = '/path/to';
+                    const lstatsAsyncStub = sandbox.stub(fsAsync, 'lstatAsync').resolves();
+                    const fileCheck = existsAsyncStub
+                        .onFirstCall()
+                        .resolves(true)
+                        .onSecondCall()
+                        .resolves(false);
+                    const readDirectory = readdirAsyncStub.resolves(['dir', 'file.txt']);
+                    const lstats = lstatsAsyncStub
+                        .onFirstCall()
+                        .resolves({
+                        isDirectory: () => true,
+                    })
+                        .onSecondCall()
+                        .resolves({
+                        isDirectory: () => false,
+                    });
+                    const deleteFile = sandbox.stub(fsAsync, 'unlinkAsync').resolves();
+                    const removeDirectory = sandbox.stub(fsAsync, 'rmdirAsync').resolves();
+                    yield utils_1.Utils.deleteDirectoryRecursively(directoryPath);
+                    chai_1.expect(fileCheck.calledTwice).to.be.true;
+                    chai_1.expect(readDirectory.calledOnce).to.be.true;
+                    chai_1.expect(lstats.calledTwice).to.be.true;
+                    chai_1.expect(deleteFile.calledOnce).to.be.true;
+                    chai_1.expect(removeDirectory.calledOnce).to.be.true;
+                });
             });
         });
         context(`the 'parseJSON' function`, function () {
             it('returns an object when parsing succeeds', function () {
-                const json = utils.parseJSON('{"test": "test"}');
+                const json = utils_1.Utils.parseJSON('{"test": "test"}');
                 chai_1.expect(json).to.be.instanceOf(Object);
                 chai_1.expect(Object.getOwnPropertyNames(json)).to.include('test');
                 chai_1.expect(json['test']).to.be.equal('test');
             });
             it(`returns 'null' when parsing fails`, function () {
-                chai_1.expect(utils.parseJSON('test')).to.be.null;
+                chai_1.expect(utils_1.Utils.parseJSON('test')).to.be.null;
             });
         });
         context(`the 'getRelativePath' function`, function () {
-            it('does not throw an Error, ' +
-                'if the destination directory does not exists and a directory check should not be done', function () {
-                const toDirName = 'path/to';
-                chai_1.expect(utils.getRelativePath.bind(utils.getRelativePath, 'path/from', toDirName, false)).to.not.throw(Error, `Directory '${toDirName}' not found.`);
+            context(`does NOT throw an Error`, function () {
+                context(`if the destination directory does NOT exists`, function () {
+                    it('and a directory check should NOT be done', function () {
+                        const toDirName = 'path/to';
+                        chai_1.expect(() => utils_1.Utils.getRelativePath('path/from', toDirName, false)).to.not.throw(Error, `Directory '${toDirName}' not found.`);
+                    });
+                });
             });
             context('returns a relative path that', function () {
                 context('has a trailing path separator', function () {
-                    const trailingPathSeparatorTest = (toDirName) => {
-                        const relativePath = utils.getRelativePath('path/from', toDirName, false);
+                    const trailingPathSeparatorTest = (toDirName) => __awaiter(this, void 0, void 0, function* () {
+                        const relativePath = yield utils_1.Utils.getRelativePath('path/from', toDirName, false);
                         chai_1.expect(/\/$/g.test(relativePath)).to.be.true;
                         chai_1.expect(/\/{2,}$/g.test(relativePath)).to.be.false;
-                    };
-                    it('if it is provided', function () {
-                        trailingPathSeparatorTest('path/to/');
                     });
-                    it('if it is not provided', function () {
-                        trailingPathSeparatorTest('path/to');
+                    it(`if it's provided`, function () {
+                        return __awaiter(this, void 0, void 0, function* () {
+                            yield trailingPathSeparatorTest('path/to/');
+                        });
                     });
-                    it('that is not repeated', function () {
-                        trailingPathSeparatorTest('path/to//');
-                        trailingPathSeparatorTest('path/to///');
+                    it(`if it's NOT provided`, function () {
+                        return __awaiter(this, void 0, void 0, function* () {
+                            yield trailingPathSeparatorTest('path/to');
+                        });
+                    });
+                    it('that is NOT repeated', function () {
+                        return __awaiter(this, void 0, void 0, function* () {
+                            yield trailingPathSeparatorTest('path/to//');
+                            yield trailingPathSeparatorTest('path/to///');
+                        });
                     });
                 });
             });
-            context('throws an Error if', function () {
-                it('the `fromDirPath` parameter is not defined', function () {
-                    chai_1.expect(utils.getRelativePath.bind(utils.getRelativePath, null, 'path/to')).to.throw(Error, 'fromDirPath not defined.');
+            context('throws an Error', function () {
+                it('if the `fromDirPath` parameter is NOT defined', function () {
+                    return __awaiter(this, void 0, void 0, function* () {
+                        try {
+                            yield utils_1.Utils.getRelativePath(null, 'path/to');
+                        }
+                        catch (error) {
+                            chai_1.expect(error).to.match(/fromDirPath not defined\./);
+                        }
+                    });
                 });
-                it('the `toDirName` parameter is not defined', function () {
-                    chai_1.expect(utils.getRelativePath.bind(utils.getRelativePath, 'path/from', null)).to.throw(Error, 'toDirName not defined.');
+                it('if the `toDirName` parameter is NOT defined', function () {
+                    return __awaiter(this, void 0, void 0, function* () {
+                        try {
+                            yield utils_1.Utils.getRelativePath('path/from', null);
+                        }
+                        catch (error) {
+                            chai_1.expect(error).to.match(/toDirName not defined\./);
+                        }
+                    });
                 });
-                it('the destination directory does not exists', function () {
-                    const toDirName = 'path/to';
-                    chai_1.expect(utils.getRelativePath.bind(utils.getRelativePath, 'path/from', toDirName)).to.throw(Error, `Directory '${toDirName}' not found.`);
+                it('the destination directory does NOT exists', function () {
+                    return __awaiter(this, void 0, void 0, function* () {
+                        const toDirName = 'path/to';
+                        try {
+                            yield utils_1.Utils.getRelativePath('path/from', toDirName);
+                        }
+                        catch (error) {
+                            chai_1.expect(error).to.match(new RegExp(`Directory '${toDirName}' not found.`));
+                        }
+                    });
                 });
             });
         });
         context(`the 'removeFirstDot' function`, function () {
             it('removes the leading dot', function () {
-                chai_1.expect(utils.removeFirstDot('.test')).to.be.equal('test');
+                chai_1.expect(utils_1.Utils.removeFirstDot('.test')).to.be.equal('test');
+            });
+            it('ignores when no leading dot', function () {
+                chai_1.expect(utils_1.Utils.removeFirstDot('test')).to.be.equal('test');
+            });
+        });
+        context(`the 'belongToSameDrive' function`, function () {
+            it(`returns 'false', when paths do NOT belong to the same drive`, function () {
+                chai_1.expect(utils_1.Utils.belongToSameDrive('C:\\path\\to', 'D:\\path\to')).to.be.false;
+            });
+            it(`returns 'true', when paths do belong to the same drive`, function () {
+                chai_1.expect(utils_1.Utils.belongToSameDrive('C:\\path\\to', 'C:\\anotherpath\to')).to.be.true;
             });
         });
         context(`the 'overwriteDrive' function`, function () {
             it('overwrites the drive', function () {
                 const sourcePath = 'C:\\path\\to';
                 const destPath = 'D:\\path\\to';
-                chai_1.expect(utils.overwriteDrive(sourcePath, destPath)).to.be.equal(sourcePath);
+                chai_1.expect(utils_1.Utils.overwriteDrive(sourcePath, destPath)).to.be.equal(sourcePath);
             });
         });
         context(`the 'getDrives' function returns an`, function () {
             it('Array of the provided drives', function () {
                 const drive1 = 'C:';
                 const drive2 = 'D:';
-                chai_1.expect(utils.getDrives(drive1))
+                chai_1.expect(utils_1.Utils.getDrives(drive1))
                     .to.be.an.instanceOf(Array)
                     .and.include(drive1);
-                chai_1.expect(utils.getDrives(drive1, drive2))
+                chai_1.expect(utils_1.Utils.getDrives(drive1, drive2))
                     .an.instanceOf(Array)
                     .and.include.members([drive1, drive2]);
             });
             it('empty Array, if no drive is provided', function () {
-                chai_1.expect(utils.getDrives()).to.be.an.instanceOf(Array).and.be.empty;
+                chai_1.expect(utils_1.Utils.getDrives()).to.be.an.instanceOf(Array).and.be.empty;
             });
-            it('Array of undefined drives, if provided paths are not actual drives', function () {
-                chai_1.expect(utils.getDrives('/', 'file:///'))
+            it('Array of undefined drives, if provided paths are NOT actual drives', function () {
+                chai_1.expect(utils_1.Utils.getDrives('/', 'file:///'))
                     .to.be.an.instanceOf(Array)
                     .and.include.members([undefined]);
-            });
-        });
-        context(`the 'flatten' function`, function () {
-            it('converts an object with nested objects to a flat object', function () {
-                const obj = {
-                    I: {
-                        wonna: {
-                            have: {
-                                more: 'stuff',
-                                other: 'stuff',
-                                all: {
-                                    the: 'world',
-                                },
-                            },
-                        },
-                        aint: {
-                            last: 'one',
-                        },
-                        am: 'bored',
-                        known: {
-                            nothing: null,
-                        },
-                    },
-                    more: 'stuff',
-                    ipsum: {
-                        lorem: 'latin',
-                    },
-                };
-                const flatObjKeys = [
-                    'I.wonna.have.more',
-                    'I.wonna.have.other',
-                    'I.wonna.have.all.the',
-                    'I.aint.last',
-                    'I.am',
-                    'I.known.nothing',
-                    'more',
-                    'ipsum.lorem',
-                ];
-                const flatObj = utils.flatten(obj);
-                chai_1.expect(flatObj)
-                    .to.be.an('object')
-                    .that.has.all.keys(flatObjKeys);
-            });
-        });
-        context(`the 'getEnumMember' function`, function () {
-            it('returns the enum member', function () {
-                const Enum = { angular: 'ng' };
-                chai_1.expect(utils.getEnumMemberByValue(Enum, Enum.angular)).to.be.equal('angular');
-            });
-            it('throws an Error when a non Enum object is provided', function () {
-                const Enum = 'ng';
-                chai_1.expect(utils.getEnumMemberByValue.bind(utils.getEnumMemberByValue, Enum, Enum)).to.throw(Error, /Only Enum allowed/);
             });
         });
         context(`the 'combine' function`, function () {
@@ -233,9 +294,103 @@ describe('Utils: tests', function () {
                     'webpack.common.coffee',
                     'webpack.common.ts',
                 ];
-                chai_1.expect(utils.combine(array1, array2))
+                chai_1.expect(utils_1.Utils.combine(array1, array2))
                     .to.be.an.instanceOf(Array)
                     .and.have.deep.members(combinedArray);
+            });
+        });
+        context(`the 'updateFile' function`, function () {
+            let readFileAsyncStub;
+            let writeFileAsyncStub;
+            let replacerStub;
+            beforeEach(function () {
+                readFileAsyncStub = sandbox.stub(fsAsync, 'readFileAsync');
+                writeFileAsyncStub = sandbox.stub(fsAsync, 'writeFileAsync').resolves();
+                replacerStub = sandbox.stub();
+            });
+            it('rejects on file read error', function () {
+                return __awaiter(this, void 0, void 0, function* () {
+                    readFileAsyncStub.rejects(new Error('error on read'));
+                    try {
+                        yield utils_1.Utils.updateFile('', replacerStub);
+                    }
+                    catch (err) {
+                        chai_1.expect(replacerStub.called).to.be.false;
+                        chai_1.expect(err)
+                            .to.be.an.instanceof(Error)
+                            .that.matches(/error on read/);
+                    }
+                });
+            });
+            it('rejects on file write error', function () {
+                return __awaiter(this, void 0, void 0, function* () {
+                    readFileAsyncStub.resolves('');
+                    writeFileAsyncStub.rejects(new Error('error on write'));
+                    replacerStub.returns([]);
+                    try {
+                        yield utils_1.Utils.updateFile('', replacerStub);
+                    }
+                    catch (error) {
+                        chai_1.expect(replacerStub.calledOnce).to.be.true;
+                        chai_1.expect(error)
+                            .to.be.an.instanceof(Error)
+                            .that.matches(/error on write/);
+                    }
+                });
+            });
+            it('correctly detects unix style EOL (LF)', function () {
+                return __awaiter(this, void 0, void 0, function* () {
+                    readFileAsyncStub.resolves('\n');
+                    replacerStub.returns([]);
+                    const result = yield utils_1.Utils.updateFile('', replacerStub);
+                    chai_1.expect(replacerStub.calledOnce).to.be.true;
+                    chai_1.expect(result).to.be.undefined;
+                });
+            });
+            it('correctly detects windows style EOL (CRLF)', function () {
+                return __awaiter(this, void 0, void 0, function* () {
+                    readFileAsyncStub.resolves('\r\n');
+                    replacerStub.returns([]);
+                    const result = yield utils_1.Utils.updateFile('', replacerStub);
+                    chai_1.expect(replacerStub.calledOnce).to.be.true;
+                    chai_1.expect(result).to.be.undefined;
+                });
+            });
+            it(`updates the file`, function () {
+                return __awaiter(this, void 0, void 0, function* () {
+                    readFileAsyncStub.resolves('text\n');
+                    // Note: it's up to the replacer to provide the correct replaced context
+                    replacerStub.returns(['replaced\n']);
+                    const result = yield utils_1.Utils.updateFile('', replacerStub);
+                    chai_1.expect(replacerStub.calledOnce).to.be.true;
+                    chai_1.expect(result).to.be.undefined;
+                });
+            });
+        });
+        context(`the 'unflattenProperties' function`, function () {
+            it(`returns an object with individual properties structure`, function () {
+                const obj = {
+                    'vsicons.dontShowNewVersionMessage': {
+                        default: false,
+                    },
+                };
+                chai_1.expect(utils_1.Utils.unflattenProperties(obj, 'default'))
+                    .to.be.an('object')
+                    .with.ownProperty('vsicons')
+                    .and.that.to.haveOwnProperty('dontShowNewVersionMessage').and.that.to.be.false;
+            });
+        });
+        context(`the 'open' function`, function () {
+            it(`to call the external module`, function () {
+                return __awaiter(this, void 0, void 0, function* () {
+                    const openStub = sandbox.stub().resolves();
+                    const target = 'target';
+                    const utils = proxyq.noCallThru().load('../../src/utils', {
+                        open: openStub,
+                    }).Utils;
+                    yield utils.open(target);
+                    chai_1.expect(openStub.calledOnceWithExactly(target, undefined)).to.be.true;
+                });
             });
         });
     });

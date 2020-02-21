@@ -1,65 +1,64 @@
-import * as models from '../models/i18n';
-import { langResourceCollection } from './langResourceCollection';
+import * as langResources from '../../../lang.nls.bundle.json';
 import { constants } from '../constants';
+import * as models from '../models';
 
 export class LanguageResourceManager
   implements models.ILanguageResourceManager {
-  private messages: models.ILangResource;
-
-  constructor(
-    private language: string,
-    private resourceCollection?:
-      | models.ILangResourceCollection
-      | { [key: string]: { [key: string]: string | models.IOSSpecific } },
-  ) {
-    this.resourceCollection = this.resourceCollection || langResourceCollection;
-    this.messages =
-      (this.language && this.resourceCollection[this.language.toLowerCase()]) ||
-      this.resourceCollection['en'];
+  private defaultLangResource: [];
+  private currentLangResource: [];
+  constructor(private locale: string) {
+    this.defaultLangResource = langResources.en;
+    this.currentLangResource =
+      (this.locale && langResources[this.locale]) || this.defaultLangResource;
   }
 
-  public getMessage(...keys: Array<models.LangResourceKeys | string>): string {
-    if (!this.messages) {
-      return '';
-    }
-
+  public localize(...keys: models.LangResourceLike[]): string {
     let msg = '';
-    keys.forEach(key => {
-      // If key is of type 'number' it's a LangResourceKeys
-      const stringifiedKey =
-        typeof key === 'number' ? models.LangResourceKeys[key] : key;
+    keys
+      .filter(
+        (key: models.LangResourceLike) => key !== null && key !== undefined,
+      )
+      .forEach((key: models.LangResourceLike) => {
+        if (typeof key === 'number') {
+          const resourceKey = key as number;
+          if (this.currentLangResource.length > resourceKey) {
+            // If no message is found fallback to english message
+            let message: string | models.IOSSpecific =
+              this.currentLangResource[resourceKey] ||
+              this.defaultLangResource[resourceKey];
 
-      if (typeof key === 'number') {
-        if (Reflect.has(this.messages, stringifiedKey)) {
-          // If no message is found fallback to english message
-          let message: string | models.IOSSpecific =
-            this.messages[stringifiedKey] ||
-            langResourceCollection['en'][stringifiedKey];
-
-          // If not a string then it's of type IOSSpecific
-          if (typeof message !== 'string') {
-            if (Reflect.has(message as models.IOSSpecific, process.platform)) {
-              message = message[process.platform];
-            } else {
-              throw new Error(`Not Implemented: ${process.platform}`);
+            // If not a string then it's of type IOSSpecific
+            if (typeof message !== 'string') {
+              if (Reflect.has(message, process.platform)) {
+                message = message[process.platform];
+              } else {
+                throw new Error(`Not Implemented: ${process.platform}`);
+              }
             }
+            msg += message;
+            return;
           }
-          msg += message as string;
-          return;
-        }
-        throw new Error(`${stringifiedKey} is not valid`);
-      }
-
-      stringifiedKey.split('').forEach(char => {
-        if (char.match(/[#^*|\\/{}+=]/g)) {
-          throw new Error(`${char} is not valid`);
+          throw new Error(`Language resource key '${key}' is not valid`);
         }
 
-        msg += char;
-        return;
+        key.split('').forEach(char => {
+          if (char.match(/[#^*|\\/{}+=]/g)) {
+            throw new Error(`${char} is not valid`);
+          }
+          msg += char;
+        });
       });
-    });
 
-    return msg.replace(/%extensionName%/gi, constants.extensionName).trim();
+    return msg.replace(/%extensionName%/gi, constants.extension.name).trim();
+  }
+
+  public getLangResourceKey(
+    message?: string,
+  ): models.LangResourceKeys | undefined {
+    if (!message) {
+      return undefined;
+    }
+    const key = this.currentLangResource.findIndex(res => res === message);
+    return key > -1 ? key : undefined;
   }
 }

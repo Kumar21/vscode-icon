@@ -6,6 +6,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 __export(require("./contributions"));
 __export(require("./extensions"));
 __export(require("./i18n"));
+__export(require("./iconsManifest"));
+__export(require("./ioc/symbols"));
 __export(require("./projectDetector"));
 __export(require("./settings"));
+__export(require("./vscode"));
 //# sourceMappingURL=index.js.map

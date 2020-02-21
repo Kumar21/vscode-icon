@@ -1,169 +1,184 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import { IVSCode, FileFormat } from '../models';
+import open = require('open');
+import { ChildProcess } from 'child_process';
+import { Stats } from 'fs';
+import {
+  existsAsync,
+  lstatAsync,
+  mkdirAsync,
+  readdirAsync,
+  readFileAsync,
+  rmdirAsync,
+  unlinkAsync,
+  writeFileAsync,
+} from '../common/fsAsync';
+import { set } from 'lodash';
+import { homedir, tmpdir } from 'os';
+import { isAbsolute, posix, sep, relative, resolve } from 'path';
+import { FileFormat } from '../models';
 
-export const vscode: IVSCode = {
-  env: { appName: 'Code' },
-  version: '1000.0.0',
-  workspace: {},
-};
-
-export function pathUnixJoin(...paths: string[]): string {
-  return path.posix.join(...paths);
-}
-
-export function vscodePath(): string {
-  switch (process.platform) {
-    case 'darwin':
-      return `${os.homedir()}/Library/Application Support`;
-    case 'linux':
-      return `${os.homedir()}/.config`;
-    case 'win32':
-      return process.env.APPDATA;
-    default:
-      return '/var/local';
-  }
-}
-
-export function tempPath(): string {
-  return os.tmpdir();
-}
-
-export function fileFormatToString(extension: FileFormat | string): string {
-  return `.${
-    typeof extension === 'string' ? extension.trim() : FileFormat[extension]
-  }`;
-}
-
-/**
- * Creates a directory and all subdirectories synchronously
- *
- * @param {any} dirPath The directory's path
- */
-export function createDirectoryRecursively(dirPath: string): void {
-  dirPath.split(path.posix.sep).reduce((parentDir, childDir) => {
-    const curDir = path.resolve(parentDir, childDir);
-    if (!fs.existsSync(curDir)) {
-      fs.mkdirSync(curDir);
+export class Utils {
+  public static getAppDataDirPath(): string {
+    switch (process.platform) {
+      case 'darwin':
+        return `${homedir()}/Library/Application Support`;
+      case 'linux':
+        return `${homedir()}/.config`;
+      case 'win32':
+        return process.env.APPDATA;
+      default:
+        return '/var/local';
     }
-    return curDir;
-  }, path.isAbsolute(dirPath) ? path.posix.sep : '');
-}
+  }
 
-/**
- * Deletes a directory and all subdirectories synchronously
- *
- * @param {any} dirPath The directory's path
- */
-export function deleteDirectoryRecursively(dirPath: string): void {
-  if (fs.existsSync(dirPath)) {
-    fs.readdirSync(dirPath).forEach(file => {
+  public static pathUnixJoin(...paths: string[]): string {
+    return posix.join(...paths);
+  }
+
+  public static tempPath(): string {
+    return tmpdir();
+  }
+
+  public static fileFormatToString(extension: FileFormat | string): string {
+    return `.${
+      typeof extension === 'string' ? extension.trim() : FileFormat[extension]
+    }`;
+  }
+
+  /**
+   * Creates a directory and all subdirectories asynchronously
+   */
+  public static async createDirectoryRecursively(
+    dirPath: string,
+  ): Promise<void> {
+    const callbackFn = async (
+      parentDir: Promise<string>,
+      childDir: string,
+    ): Promise<string> => {
+      const curDir = resolve(await parentDir, childDir);
+      const dirExists: boolean = await existsAsync(curDir);
+      if (!dirExists) {
+        await mkdirAsync(curDir);
+      }
+      return curDir;
+    };
+    await dirPath
+      .split(sep)
+      .reduce(callbackFn, Promise.resolve(isAbsolute(dirPath) ? sep : ''));
+  }
+
+  /**
+   * Deletes a directory and all subdirectories asynchronously
+   */
+  public static async deleteDirectoryRecursively(
+    dirPath: string,
+  ): Promise<void> {
+    const dirExists: boolean = await existsAsync(dirPath);
+    if (!dirExists) {
+      return;
+    }
+    const iterator = async (file: string): Promise<void> => {
       const curPath = `${dirPath}/${file}`;
-      if (fs.lstatSync(curPath).isDirectory()) {
+      const stats: Stats = await lstatAsync(curPath);
+      if (stats.isDirectory()) {
         // recurse
-        deleteDirectoryRecursively(curPath);
+        await this.deleteDirectoryRecursively(curPath);
       } else {
         // delete file
-        fs.unlinkSync(curPath);
+        await unlinkAsync(curPath);
       }
-    });
-    fs.rmdirSync(dirPath);
-  }
-}
-
-/**
- * Converts a JavaScript Object Notation (JSON) string into an object
- * without throwing an exception.
- *
- * @param {string} text A valid JSON string.
- */
-export function parseJSON(text: string): any {
-  try {
-    return JSON.parse(text);
-  } catch (err) {
-    return null;
-  }
-}
-
-export function getRelativePath(
-  fromDirPath: string,
-  toDirName: string,
-  checkDirectory: boolean = true,
-): string {
-  if (fromDirPath == null) {
-    throw new Error('fromDirPath not defined.');
+    };
+    const promises: Array<Promise<void>> = [];
+    const files: string[] = await readdirAsync(dirPath);
+    files.forEach((file: string) => promises.push(iterator(file)));
+    await Promise.all(promises);
+    await rmdirAsync(dirPath);
   }
 
-  if (toDirName == null) {
-    throw new Error('toDirName not defined.');
-  }
-
-  if (checkDirectory && !fs.existsSync(toDirName)) {
-    throw new Error(`Directory '${toDirName}' not found.`);
-  }
-
-  return path
-    .relative(fromDirPath, toDirName)
-    .replace(/\\/g, '/')
-    .concat('/');
-}
-
-export function removeFirstDot(txt: string): string {
-  return txt.indexOf('.') === 0 ? txt.substring(1, txt.length) : txt;
-}
-
-export function belongToSameDrive(path1: string, path2: string): boolean {
-  const [val1, val2] = this.getDrives(path1, path2);
-  return val1 === val2;
-}
-
-export function overwriteDrive(sourcePath: string, destPath: string): string {
-  const [val1, val2] = this.getDrives(sourcePath, destPath);
-  return destPath.replace(val2, val1);
-}
-
-export function getDrives(...paths: string[]): string[] {
-  const rx = new RegExp('^[a-zA-Z]:');
-  return paths.map(x => (rx.exec(x) || [])[0]);
-}
-
-export function flatten(obj: object, separator = '.'): object {
-  const isValidObject = (value: any): boolean => {
-    if (!value) {
-      return false;
+  /**
+   * Converts a JavaScript Object Notation (JSON) string into an object
+   * without throwing an exception.
+   */
+  public static parseJSON(text: string): any {
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      return null;
     }
-    const isArray = Array.isArray(value);
-    const isBuffer = Buffer.isBuffer(value);
-    const isΟbject =
-      Object.prototype.toString.call(value) === '[object Object]';
-    const hasKeys = !!Object.keys(value).length;
-    return !isArray && !isBuffer && isΟbject && hasKeys;
-  };
-  const _flatten = (child: any, paths = []): object[] => {
-    return [].concat(
-      ...Object.keys(child).map(
-        key =>
-          isValidObject(child[key])
-            ? _flatten(child[key], [...paths, key])
-            : { [[...paths, key].join(separator)]: child[key] },
-      ),
-    );
-  };
-  return Object.assign({}, ..._flatten(obj));
-}
-
-export function getEnumMemberByValue(obj: object, enumValue: string): string {
-  if (typeof obj !== 'object') {
-    throw new Error('Only Enum allowed');
   }
-  return Object.keys(obj).find(key => obj[key] === enumValue);
-}
 
-export function combine(array1: any[], array2: any[], separator = '.'): any[] {
-  return array1.reduce(
-    (previous: string[], current: string) =>
-      previous.concat(array2.map(value => [current, value].join(separator))),
-    [],
-  );
+  public static async getRelativePath(
+    fromDirPath: string,
+    toDirName: string,
+    checkDirectory = true,
+  ): Promise<string> {
+    if (fromDirPath == null) {
+      throw new Error('fromDirPath not defined.');
+    }
+
+    if (toDirName == null) {
+      throw new Error('toDirName not defined.');
+    }
+
+    const dirExists: boolean = await existsAsync(toDirName);
+    if (checkDirectory && !dirExists) {
+      throw new Error(`Directory '${toDirName}' not found.`);
+    }
+
+    return relative(fromDirPath, toDirName)
+      .replace(/\\/g, '/')
+      .concat('/');
+  }
+
+  public static removeFirstDot(txt: string): string {
+    return txt.replace(/^\./, '');
+  }
+
+  public static belongToSameDrive(path1: string, path2: string): boolean {
+    const [val1, val2] = this.getDrives(path1, path2);
+    return val1 === val2;
+  }
+
+  public static overwriteDrive(sourcePath: string, destPath: string): string {
+    const [val1, val2] = this.getDrives(sourcePath, destPath);
+    return destPath.replace(val2, val1);
+  }
+
+  public static getDrives(...paths: string[]): string[] {
+    const rx = new RegExp('^[a-zA-Z]:');
+    return paths.map(x => (rx.exec(x) || [])[0]);
+  }
+
+  public static combine(array1: any[], array2: any[]): any[] {
+    return array1.reduce(
+      (previous: string[], current: string) =>
+        previous.concat(array2.map(value => [current, value].join('.'))),
+      [],
+    );
+  }
+
+  public static async updateFile(
+    filePath: string,
+    replaceFn: (rawText: string[]) => string[],
+  ): Promise<void> {
+    const raw = await readFileAsync(filePath, 'utf8');
+    const lineBreak: string = /\r\n$/.test(raw) ? '\r\n' : '\n';
+    const allLines: string[] = raw.split(lineBreak);
+    const data: string = replaceFn(allLines).join(lineBreak);
+    await writeFileAsync(filePath, data);
+  }
+
+  public static unflattenProperties<T>(
+    obj: { [key: string]: any },
+    lookupKey: string,
+  ): T {
+    const newObj = {};
+    Reflect.ownKeys(obj).forEach((key: string) =>
+      set(newObj, key, obj[key][lookupKey]),
+    );
+    return newObj as T;
+  }
+
+  public static open(target: string, options?: any): Promise<ChildProcess> {
+    return open(target, options);
+  }
 }

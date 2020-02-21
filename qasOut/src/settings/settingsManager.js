@@ -1,102 +1,113 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs = require("fs");
-const semver = require("semver");
-const utils_1 = require("../utils");
-const models_1 = require("../models");
-const extensionSettings_1 = require("./extensionSettings");
+const semver_1 = require("semver");
+const errorHandler_1 = require("../common/errorHandler");
+const fsAsync_1 = require("../common/fsAsync");
 const constants_1 = require("../constants");
-const errorHandler_1 = require("../errorHandler");
+const models_1 = require("../models");
+const utils_1 = require("../utils");
 class SettingsManager {
-    constructor(vscode) {
-        this.vscode = vscode;
-        this.getSettings();
+    constructor(vscodeManager) {
+        this.vscodeManager = vscodeManager;
+        if (!vscodeManager) {
+            throw new ReferenceError(`'vscodeManager' not set to an instance`);
+        }
     }
-    getSettings() {
-        if (this.settings) {
-            return this.settings;
-        }
-        const isDev = /dev/i.test(this.vscode.env.appName);
-        const isOSS = !isDev && /oss/i.test(this.vscode.env.appName);
-        const isInsiders = /insiders/i.test(this.vscode.env.appName);
-        const vscodeVersion = new semver.SemVer(this.vscode.version).version;
-        const isWin = /^win/.test(process.platform);
-        const vscodeAppName = process.env.VSCODE_PORTABLE
-            ? 'user-data'
-            : isInsiders
-                ? 'Code - Insiders'
-                : isOSS
-                    ? 'Code - OSS'
-                    : isDev
-                        ? 'qas'
-                        : 'Code';
-        const appPath = process.env.VSCODE_PORTABLE || utils_1.vscodePath();
-        const vscodeAppUserPath = utils_1.pathUnixJoin(appPath, vscodeAppName, 'User');
-        const workspacePath = this.getWorkspacePath();
-        this.settings = {
-            vscodeAppUserPath,
-            workspacePath,
-            isWin,
-            isInsiders,
-            isOSS,
-            isDev,
-            settingsFilePath: utils_1.pathUnixJoin(vscodeAppUserPath, constants_1.constants.extensionSettingsFilename),
-            vscodeVersion,
-            extensionSettings: extensionSettings_1.extensionSettings,
-        };
-        return this.settings;
-    }
-    getWorkspacePath() {
-        if (this.vscode.workspace.workspaceFolders) {
-            return this.vscode.workspace.workspaceFolders.reduce((a, b) => {
-                a.push(b.uri.fsPath);
-                return a;
-            }, []);
-        }
-        if (this.vscode.workspace.rootPath) {
-            return [this.vscode.workspace.rootPath];
-        }
+    get isNewVersion() {
+        return semver_1.lt(this.getState().version, constants_1.constants.extension.version);
     }
     getState() {
-        const defaultState = {
-            version: '0.0.0',
-            status: models_1.ExtensionStatus.notActivated,
-            welcomeShown: false,
-        };
-        if (!fs.existsSync(this.settings.settingsFilePath)) {
-            return defaultState;
-        }
-        try {
-            const state = fs.readFileSync(this.settings.settingsFilePath, 'utf8');
-            return utils_1.parseJSON(state) || defaultState;
-        }
-        catch (error) {
-            errorHandler_1.ErrorHandler.logError(error, true);
-            return defaultState;
-        }
+        const state = this.vscodeManager.context.globalState.get(constants_1.constants.vsicons.name);
+        return state || SettingsManager.defaultState;
     }
     setState(state) {
-        try {
-            fs.writeFileSync(this.settings.settingsFilePath, JSON.stringify(state));
-        }
-        catch (error) {
-            errorHandler_1.ErrorHandler.logError(error);
-        }
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                yield this.vscodeManager.context.globalState.update(constants_1.constants.vsicons.name, state);
+            }
+            catch (reason) {
+                errorHandler_1.ErrorHandler.logError(reason);
+            }
+        });
     }
-    updateStatus(sts) {
-        const state = this.getState();
-        state.version = extensionSettings_1.extensionSettings.version;
-        state.status = sts == null ? state.status : sts;
-        state.welcomeShown = true;
-        this.setState(state);
-        return state;
+    updateStatus(status) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const state = this.getState();
+            state.version = constants_1.constants.extension.version;
+            state.status = status == null ? state.status : status;
+            state.welcomeShown = true;
+            yield this.setState(state);
+            return state;
+        });
     }
     deleteState() {
-        fs.unlinkSync(this.settings.settingsFilePath);
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                yield this.vscodeManager.context.globalState.update(constants_1.constants.vsicons.name, undefined);
+            }
+            catch (error) {
+                errorHandler_1.ErrorHandler.logError(error);
+            }
+        });
     }
-    isNewVersion() {
-        return semver.lt(this.getState().version, this.settings.extensionSettings.version);
+    moveStateFromLegacyPlace() {
+        return __awaiter(this, void 0, void 0, function* () {
+            // read state from legacy place
+            const state = yield this.getStateLegacy();
+            // state not found in legacy place
+            if (semver_1.eq(state.version, SettingsManager.defaultState.version)) {
+                return;
+            }
+            // store in new place: 'globalState'
+            yield this.setState(state);
+            // delete state from legacy place
+            return this.deleteStateLegacy();
+        });
+    }
+    /** Obsolete */
+    getStateLegacy() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const extensionSettingsLegacyFilePath = utils_1.Utils.pathUnixJoin(this.vscodeManager.getAppUserDirPath(), constants_1.constants.extension.settingsFilename);
+            const pathExists = yield fsAsync_1.existsAsync(extensionSettingsLegacyFilePath);
+            if (!pathExists) {
+                return SettingsManager.defaultState;
+            }
+            try {
+                const state = yield fsAsync_1.readFileAsync(extensionSettingsLegacyFilePath, 'utf8');
+                return utils_1.Utils.parseJSON(state) || SettingsManager.defaultState;
+            }
+            catch (error) {
+                errorHandler_1.ErrorHandler.logError(error, true);
+                return SettingsManager.defaultState;
+            }
+        });
+    }
+    /** Obsolete */
+    deleteStateLegacy() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const extensionSettingsLegacyFilePath = utils_1.Utils.pathUnixJoin(this.vscodeManager.getAppUserDirPath(), constants_1.constants.extension.settingsFilename);
+            try {
+                yield fsAsync_1.unlinkAsync(extensionSettingsLegacyFilePath);
+            }
+            catch (error) {
+                errorHandler_1.ErrorHandler.logError(error);
+            }
+        });
     }
 }
 exports.SettingsManager = SettingsManager;
+SettingsManager.defaultState = {
+    version: '0.0.0',
+    status: models_1.ExtensionStatus.deactivated,
+    welcomeShown: false,
+};
 //# sourceMappingURL=settingsManager.js.map

@@ -1,15 +1,33 @@
 {
-  "tslint.enable": true,
-  "editor.tabSize": 2,
-  "files.exclude": {
-    "qasOut": false
-  },
-  "search.exclude": {
-    "qasOut": true,
-    "images": true,
-    "icons": true,
-    "examples": true
-  },
-  "typescript.tsdk": "./node_modules/typescript/lib",
-  "vsicons.projectDetection.disableDetect": true
+    "[json]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[typescript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": true
+    },
+    "editor.tabSize": 2,
+    "files.associations": {
+        ".huskyrc": "json",
+        ".lintstagedrc": "json",
+        ".nsrirc": "json",
+        ".nycrc": "json"
+    },
+    "files.exclude": {
+        "qasOut": false
+    },
+    "npm.exclude": "**/submodules/**",
+    "search.exclude": {
+        "qasOut": true,
+        "images": true,
+        "icons": true,
+        "examples": true
+    },
+    "typescript.tsdk": "./node_modules/typescript/lib",
+    "vsicons.projectDetection.disableDetect": true
 }

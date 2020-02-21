@@ -4,5 +4,6 @@ var Projects;
 (function (Projects) {
     Projects["angular"] = "ng";
     Projects["angularjs"] = "ngjs";
+    Projects["nestjs"] = "nest";
 })(Projects = exports.Projects || (exports.Projects = {}));
 //# sourceMappingURL=projects.js.map

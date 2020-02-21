@@ -1,7 +1,30 @@
 # vscode-icons
+
+[![Version](https://vsmarketplacebadge.apphb.com/version/vscode-icons-team.vscode-icons.svg)](https://marketplace.visualstudio.com/items?itemName=vscode-icons-team.vscode-icons)
+[![Installs](https://vsmarketplacebadge.apphb.com/installs-short/vscode-icons-team.vscode-icons.svg)](https://marketplace.visualstudio.com/items?itemName=vscode-icons-team.vscode-icons)
+[![Ratings](https://vsmarketplacebadge.apphb.com/rating/vscode-icons-team.vscode-icons.svg)](https://marketplace.visualstudio.com/items?itemName=vscode-icons-team.vscode-icons)
+
+[![Build Status](https://travis-ci.org/vscode-icons/vscode-icons.svg?branch=master)](https://travis-ci.org/vscode-icons/vscode-icons)
+[![Build Status](https://ci.appveyor.com/api/projects/status/github/vscode-icons/vscode-icons?branch=master&svg=true)](https://ci.appveyor.com/project/vscode-icons-team/vscode-icons)
+
+[![Dependencies Status](https://david-dm.org/vscode-icons/vscode-icons/status.svg)](https://david-dm.org/vscode-icons/vscode-icons)
+[![DevDependencies Status](https://david-dm.org/vscode-icons/vscode-icons/dev-status.svg)](https://david-dm.org/vscode-icons/vscode-icons?type=dev)
+[![Greenkeeper badge](https://badges.greenkeeper.io/vscode-icons/vscode-icons.svg)](https://greenkeeper.io/)
+
+[![Maintainability](https://api.codeclimate.com/v1/badges/4f02368ebeb7be1490bb/maintainability)](https://codeclimate.com/github/vscode-icons/vscode-icons/maintainability)
+[![Test Coverage](https://api.codeclimate.com/v1/badges/4f02368ebeb7be1490bb/test_coverage)](https://codeclimate.com/github/vscode-icons/vscode-icons/test_coverage)
+[![Known Vulnerabilities](https://snyk.io/test/github/vscode-icons/vscode-icons/badge.svg)](https://snyk.io/test/github/vscode-icons/vscode-icons)
+
+[![Average time to resolve an issue](https://isitmaintained.com/badge/resolution/vscode-icons/vscode-icons.svg)](https://isitmaintained.com/project/vscode-icons/vscode-icons "Average time to resolve an issue")
+[![Percentage of issues still open](https://isitmaintained.com/badge/open/vscode-icons/vscode-icons.svg)](https://isitmaintained.com/project/vscode-icons/vscode-icons "Percentage of issues still open")
+
+[![Wallaby.js](https://img.shields.io/badge/wallaby.js-configured-green.svg)](https://wallabyjs.com)
+
 ---
 
-Bring icons to your [Visual Studio Code](https://code.visualstudio.com/) (**minimum supported version: `1.8.1`**)
+Bring icons to your [Visual Studio Code](https://code.visualstudio.com/) (**minimum supported version: `1.31.1`**)
+
+![demo](https://raw.githubusercontent.com/vscode-icons/vscode-icons/master/images/screenshot.gif)
 
 ---
 
@@ -22,6 +45,10 @@ ext install icons
 # or
 ext install "vscode-icons"
 ```
+
+## Security
+
+`vscode-icons` utilizes [NSRI](https://www.npmjs.com/package/nsri) for its subresources integrity check and protection against code injection.
 
 ## Usage
 
@@ -66,20 +93,37 @@ In our [wiki](https://github.com/vscode-icons/vscode-icons/wiki) you can find in
 * [Supported file icons](https://github.com/vscode-icons/vscode-icons/wiki/ListOfFiles).
 * [Supported folder icons](https://github.com/vscode-icons/vscode-icons/wiki/ListOfFolders).
 
+and more.
 
-## Adding New icon
+## Credits
 
-* add language to nativeLanguageCollection.ts [ bdd: ILanguage;]
-* add parameter to languages.ts [bdd: { ids: 'bdd', defaultExtension: 'bdd' }]
-* add icon details to supportedExtensions.ts
-	[{icon: 'bdd',extensions: ['bdd'],languages: [languages.bdd],format: FileFormat.svg,}]
-* add icon to icon folder like file_type_bdd.svg
+Kudos to all [contributors](https://github.com/vscode-icons/vscode-icons/graphs/contributors) that made this extension what it is.
 
-* `Compile and Build new Icon`
-	#####
-		npm install -d
-		npm run build
+## License
 
-Note: New Build will be generated in qasout folder
+The source code is licensed under the [MIT](License) license.
+
+The icons are licensed under the [Creative Commons - ShareAlike (CC BY-SA)](https://creativecommons.org/licenses/by-sa/4.0/) license.
+
+Branded icons are licensed under their copyright license.
+
+## Versioning
+
+`vscode-icons` follows [Semantic Versioning 2.0.0](http://semver.org/).
+
+## Change Log
+
+You can checkout all our changes in our [change log](https://github.com/vscode-icons/vscode-icons/blob/master/CHANGELOG.md).
+
+## Acknowledgements
+
+We like to express our "Special Thanks" to:
+
+* The [Wallaby.js](https://wallabyjs.com) team for creating an **awesome** development tool and for their generosity in providing us with a license.
+
+## Related extensions
+
+* [vscode-icons for GitHub](https://github.com/dderevjanik/github-vscode-icons) by [@dderevjanik](https://github.com/dderevjanik) will allow you to see all `GitHub`'s files with `vscode-icons` icons.
+* [vscode-icons-js](https://github.com/dderevjanik/vscode-icons-js) by [@dderevjanik](https://github.com/dderevjanik) get file/folder specific icon from `vscode-icons` icons.
 
 **Enjoy!**

@@ -1,75 +1,25 @@
-import * as vscode from 'vscode';
-import { SettingsManager } from './settings';
-import * as init from './init';
-import { ProjectAutoDetection as pad } from './init/projectAutoDetection';
-import { ManifestReader as mr } from './icon-manifest';
-import * as commands from './commands';
-import {
-  getVsiconsConfig,
-  getConfig,
-  findFiles,
-} from './utils/vscode-extensions';
-import { LanguageResourceManager } from './i18n/languageResourceManager';
-import { IVSCodeUri, IVSIcons, Projects } from './models';
+/* eslint-disable prefer-arrow-callback */
+import { Debugger } from './common/debugger';
 import { constants } from './constants';
+import { IExtensionManager, IVSCodeExtensionContext, SYMBOLS } from './models';
+import { CompositionRootService } from './services/compositionRootService';
 
-export let initialized: boolean;
+export async function activate(
+  context: IVSCodeExtensionContext,
+): Promise<void> {
+  const crs = new CompositionRootService(context);
 
-function initialize(context: vscode.ExtensionContext): void {
-  const config = getVsiconsConfig();
-  const settingsManager = new SettingsManager(vscode);
-
-  commands.registerCommands(context);
-  init.manageWelcomeMessage(settingsManager);
-  init.manageAutoApplyCustomizations(
-    settingsManager.isNewVersion(),
-    config,
-    commands.applyCustomizationCommand,
+  const extension: IExtensionManager = crs.get<IExtensionManager>(
+    SYMBOLS.IExtensionManager,
   );
-  pad
-    .detectProject(findFiles, config)
-    .then(results => detectAngular(config, results), err => err);
+  await extension.activate();
 
-  // Update the version in settings
-  if (settingsManager.isNewVersion()) {
-    settingsManager.updateStatus();
+  if (!Debugger.isAttached) {
+    // eslint-disable-next-line no-console
+    console.info(
+      `[${constants.extension.name}] v${constants.extension.version} activated!`,
+    );
   }
-}
-
-function detectAngular(config: IVSIcons, results: IVSCodeUri[]): void {
-  if (!config || !results) {
-    return;
-  }
-  const projectInfo = pad.getProjectInfo(results, Projects.angular);
-  const i18nManager = new LanguageResourceManager(vscode.env.language);
-  const presetValue = getConfig().inspect(`vsicons.presets.angular`)
-    .workspaceValue as boolean;
-  const detectionResult = pad.checkForAngularProject(
-    presetValue,
-    mr.iconsDisabled(Projects.angular),
-    !!projectInfo,
-    i18nManager,
-  );
-
-  if (!detectionResult.apply) {
-    return;
-  }
-
-  pad.applyDetection(
-    i18nManager,
-    detectionResult,
-    config.projectDetection.autoReload,
-    commands.applyCustomization,
-    commands.showCustomizationMessage,
-    commands.reload,
-  );
-}
-
-export function activate(context: vscode.ExtensionContext): void {
-  initialize(context);
-  // tslint:disable-next-line no-console
-  console.info(`${constants.extensionName} is active!`);
-  initialized = true;
 }
 
 // this method is called when your vscode is closed

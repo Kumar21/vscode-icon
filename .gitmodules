@@ -1,0 +1,3 @@
+[submodule "submodules/examples-generator"]
+	path = submodules/examples-generator
+	url = https://github.com/vscode-icons/examples-generator

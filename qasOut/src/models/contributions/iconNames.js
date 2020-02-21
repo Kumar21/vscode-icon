@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var IconNames;
 (function (IconNames) {
     IconNames["angular"] = "ng";
+    IconNames["nestjs"] = "nest";
     IconNames["js"] = "js";
     IconNames["jsOfficial"] = "js_official";
     IconNames["ts"] = "typescript";

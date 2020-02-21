@@ -1,14 +1,15 @@
 version: '#{build}'
 image: Visual Studio 2017
 clone_depth: 5
+skip_tags: true
 build: off
 environment:
   # Define versions of Node.js
   matrix:
-    - node_js: '' # latest node
-    - node_js: 7.9.0 # vscode >= 1.16.0
-    - node_js: 7.4.0 # vscode >= 1.12.0 < 1.16.0
-    - node_js: 6.5.0 # vscode >= 1.8.0 < 1.12.0
+    - node_js: ''      # latest node
+    - node_js: 12.4.0  # vscode >= 1.40.0
+    - node_js: 10.11.0 # vscode >= 1.36.0 < 1.40.0
+    - node_js: 10.2.0  # vscode >= 1.31.0 < 1.36.0
 matrix:
   fast_finish: true
   allow_failures:
@@ -16,32 +17,18 @@ matrix:
 # Define platforms
 platform:
   - x64
+cache:
+  - node_modules
 init:
   # Install the platform version of Node.js
   - ps: Install-Product node $env:node_js $env:platform
   # Output useful info for debugging
   - node --version
   - npm --version
-  - yarn --version
   - ps: $PSVersionTable.PSVersion -f ''
 install:
-  # Install the latest version of Yarn
-  - ps: curl -o $env:temp\install.ps1 https://raw.githubusercontent.com/JimiC/ps-yarn-install/master/install.ps1 | powershell $env:temp\install.ps1
-  # Install modules
-  - yarn install
-cache:
-  # - node_modules
-  - '%LOCALAPPDATA%\Yarn'
-before_test:
-  # install coverage reporters
-  - npm i codeclimate-test-reporter --no-save
-  - npm i codecov --no-save
-  # run postinstall again to ensure that 'vscode.d.ts' is installed
-  - npm run postinstall
+  # Instal dependencies
+  - npm install
 test_script:
-  # run build script
-  - npm run build
-after_test:
-  # send coverage report
-  - ps: If ($env:CODECLIMATE_REPO_TOKEN -ne $null) { gc .\coverage\lcov.info | & .\node_modules\.bin\codeclimate-test-reporter }
-  - ps: If ($env:CODECOV_TOKEN -ne $null) { .\node_modules\.bin\codecov --disable=gcov }
+  # Run test script
+  - npm test

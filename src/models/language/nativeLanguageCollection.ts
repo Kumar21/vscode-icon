@@ -1,14 +1,17 @@
 import { ILanguage } from './language';
 
 export interface INativeLanguageCollection {
-  bat: ILanguage;
-  c: ILanguage;
-  clojure: ILanguage;
-  coffeescript: ILanguage;
-  cpp: ILanguage;
+  loc: ILanguage;
+  wsc: ILanguage;
   bdd: ILanguage;
   testreport: ILanguage;
-  loc: ILanguage;
+  bat: ILanguage;
+  c: ILanguage;
+  ceylon: ILanguage;
+  clojure: ILanguage;
+  clojurescript: ILanguage;
+  coffeescript: ILanguage;
+  cpp: ILanguage;
   css: ILanguage;
   diff: ILanguage;
   dockerfile: ILanguage;

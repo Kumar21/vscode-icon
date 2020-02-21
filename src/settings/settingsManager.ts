@@ -1,119 +1,116 @@
-import * as fs from 'fs';
-import * as semver from 'semver';
-import { vscodePath as getAppPath, parseJSON, pathUnixJoin } from '../utils';
-import {
-  ISettings,
-  IState,
-  IVSCode,
-  ISettingsManager,
-  ExtensionStatus,
-} from '../models';
-import { extensionSettings } from './extensionSettings';
+import { eq, lt } from 'semver';
+import { ErrorHandler } from '../common/errorHandler';
+import { existsAsync, readFileAsync, unlinkAsync } from '../common/fsAsync';
 import { constants } from '../constants';
-import { ErrorHandler } from '../errorHandler';
+import {
+  ExtensionStatus,
+  ISettingsManager,
+  IState,
+  IVSCodeManager,
+} from '../models';
+import { Utils } from '../utils';
 
 export class SettingsManager implements ISettingsManager {
-  private settings: ISettings;
+  public static defaultState: IState = {
+    version: '0.0.0',
+    status: ExtensionStatus.deactivated,
+    welcomeShown: false,
+  };
 
-  constructor(private vscode: IVSCode) {
-    this.getSettings();
+  constructor(private vscodeManager: IVSCodeManager) {
+    if (!vscodeManager) {
+      throw new ReferenceError(`'vscodeManager' not set to an instance`);
+    }
   }
 
-  public getSettings(): ISettings {
-    if (this.settings) {
-      return this.settings;
-    }
-    const isDev = /dev/i.test(this.vscode.env.appName);
-    const isOSS = !isDev && /oss/i.test(this.vscode.env.appName);
-    const isInsiders = /insiders/i.test(this.vscode.env.appName);
-    const vscodeVersion = new semver.SemVer(this.vscode.version).version;
-    const isWin = /^win/.test(process.platform);
-    const vscodeAppName = process.env.VSCODE_PORTABLE
-      ? 'user-data'
-      : isInsiders
-        ? 'Code - Insiders'
-        : isOSS
-          ? 'Code - OSS'
-          : isDev
-            ? 'qas'
-            : 'Code';
-    const appPath = process.env.VSCODE_PORTABLE || getAppPath();
-    const vscodeAppUserPath = pathUnixJoin(appPath, vscodeAppName, 'User');
-    const workspacePath = this.getWorkspacePath();
-
-    this.settings = {
-      vscodeAppUserPath,
-      workspacePath,
-      isWin,
-      isInsiders,
-      isOSS,
-      isDev,
-      settingsFilePath: pathUnixJoin(
-        vscodeAppUserPath,
-        constants.extensionSettingsFilename,
-      ),
-      vscodeVersion,
-      extensionSettings,
-    };
-    return this.settings;
-  }
-
-  public getWorkspacePath(): string[] {
-    if (this.vscode.workspace.workspaceFolders) {
-      return this.vscode.workspace.workspaceFolders.reduce<string[]>((a, b) => {
-        a.push(b.uri.fsPath);
-        return a;
-      }, []);
-    }
-
-    if (this.vscode.workspace.rootPath) {
-      return [this.vscode.workspace.rootPath];
-    }
+  public get isNewVersion(): boolean {
+    return lt(this.getState().version, constants.extension.version);
   }
 
   public getState(): IState {
-    const defaultState: IState = {
-      version: '0.0.0',
-      status: ExtensionStatus.notActivated,
-      welcomeShown: false,
-    };
-    if (!fs.existsSync(this.settings.settingsFilePath)) {
-      return defaultState;
-    }
+    const state = this.vscodeManager.context.globalState.get<IState>(
+      constants.vsicons.name,
+    );
+    return state || SettingsManager.defaultState;
+  }
+
+  public async setState(state: IState): Promise<void> {
     try {
-      const state = fs.readFileSync(this.settings.settingsFilePath, 'utf8');
-      return (parseJSON(state) as IState) || defaultState;
-    } catch (error) {
-      ErrorHandler.logError(error, true);
-      return defaultState;
+      await this.vscodeManager.context.globalState.update(
+        constants.vsicons.name,
+        state,
+      );
+    } catch (reason) {
+      ErrorHandler.logError(reason);
     }
   }
 
-  public setState(state: IState): void {
+  public async updateStatus(status?: ExtensionStatus): Promise<IState> {
+    const state = this.getState();
+    state.version = constants.extension.version;
+    state.status = status == null ? state.status : status;
+    state.welcomeShown = true;
+    await this.setState(state);
+    return state;
+  }
+
+  public async deleteState(): Promise<void> {
     try {
-      fs.writeFileSync(this.settings.settingsFilePath, JSON.stringify(state));
+      await this.vscodeManager.context.globalState.update(
+        constants.vsicons.name,
+        undefined,
+      );
     } catch (error) {
       ErrorHandler.logError(error);
     }
   }
 
-  public updateStatus(sts?: ExtensionStatus): IState {
-    const state = this.getState();
-    state.version = extensionSettings.version;
-    state.status = sts == null ? state.status : sts;
-    state.welcomeShown = true;
-    this.setState(state);
-    return state;
+  public async moveStateFromLegacyPlace(): Promise<void> {
+    // read state from legacy place
+    const state: IState = await this.getStateLegacy();
+    // state not found in legacy place
+    if (eq(state.version, SettingsManager.defaultState.version)) {
+      return;
+    }
+    // store in new place: 'globalState'
+    await this.setState(state);
+    // delete state from legacy place
+    return this.deleteStateLegacy();
   }
 
-  public deleteState() {
-    fs.unlinkSync(this.settings.settingsFilePath);
-  }
-
-  public isNewVersion(): boolean {
-    return semver.lt(
-      this.getState().version,
-      this.settings.extensionSettings.version,
+  /** Obsolete */
+  private async getStateLegacy(): Promise<IState> {
+    const extensionSettingsLegacyFilePath = Utils.pathUnixJoin(
+      this.vscodeManager.getAppUserDirPath(),
+      constants.extension.settingsFilename,
     );
+
+    const pathExists = await existsAsync(extensionSettingsLegacyFilePath);
+    if (!pathExists) {
+      return SettingsManager.defaultState;
+    }
+    try {
+      const state = await readFileAsync(
+        extensionSettingsLegacyFilePath,
+        'utf8',
+      );
+      return (Utils.parseJSON(state) as IState) || SettingsManager.defaultState;
+    } catch (error) {
+      ErrorHandler.logError(error, true);
+      return SettingsManager.defaultState;
+    }
+  }
+
+  /** Obsolete */
+  private async deleteStateLegacy(): Promise<void> {
+    const extensionSettingsLegacyFilePath = Utils.pathUnixJoin(
+      this.vscodeManager.getAppUserDirPath(),
+      constants.extension.settingsFilename,
+    );
+    try {
+      await unlinkAsync(extensionSettingsLegacyFilePath);
+    } catch (error) {
+      ErrorHandler.logError(error);
+    }
   }
 }

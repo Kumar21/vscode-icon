@@ -1,0 +1,14 @@
+node_modules
+dist
+qasOut
+examples
+coverage
+.vscode-test
+.nyc_output
+.DS_Store
+*.vsix
+*.lcov
+*.log
+/*bundle*.json
+/package.nls*.json
+**/.integrity.json

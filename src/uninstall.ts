@@ -1,4 +1,8 @@
-import { cleanUpVSCodeSettings, cleanUpVSIconsSettings } from './cleanUp';
+/* eslint-disable prefer-arrow-callback */
+import { ConfigManager } from './configuration/configManager';
 
-cleanUpVSIconsSettings();
-cleanUpVSCodeSettings();
+function uninstall(): Promise<void> {
+  return ConfigManager.removeSettings();
+}
+
+uninstall();
