@@ -292,7 +292,7 @@
     "tslint": "5.20.1",
     "typescript": "^3.8.1-rc",
     "webpack": "^4.41.6",
-    "webpack-cli": "^3.3.11"
+    "webpack-cli": "^3.3.12"
   },
   "dependencies": {
     "inversify": "^5.0.1",
